@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>BONK SURVIVORS 3D - Multi-Personaje</title>
+<title>BONK SURVIVORS 3D - Wave Defense</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Segoe UI',Arial,sans-serif; color:#fff; user-select:none; touch-action:none; }
@@ -20,25 +20,32 @@
   .label { font-size:9px; opacity:0.6; letter-spacing:1px; }
   .val { font-size:16px; color:#ffd93d; font-weight:bold; }
   
-  #hpBarWrap {
+  #waveDisplay {
     position:absolute; top:50px; left:50%; transform:translateX(-50%);
+    text-align:center; z-index:5; pointer-events:none;
+  }
+  #waveText {
+    font-size:24px; font-weight:bold; color:#fff; text-shadow:0 0 10px #8af;
+    margin-bottom:5px;
+  }
+  #enemiesLeft {
+    font-size:12px; color:#ff8888; font-weight:bold;
+  }
+
+  #hpBarWrap {
+    position:absolute; top:90px; left:50%; transform:translateX(-50%);
     width:200px; height:16px; background:rgba(0,0,0,0.6);
     border:2px solid #4a3a8a; border-radius:10px; overflow:hidden;
     z-index:5; box-shadow:0 0 20px rgba(0,0,0,0.5);
   }
   #hpBar { height:100%; width:100%; background:linear-gradient(90deg,#f44,#f88); transition:width 0.2s; box-shadow:0 0 15px #f44 inset; }
   #hpText {
-    position:absolute; top:50px; left:50%; transform:translateX(-50%);
+    position:absolute; top:90px; left:50%; transform:translateX(-50%);
     width:200px; height:16px; line-height:16px; text-align:center;
     font-size:10px; font-weight:bold; text-shadow:0 0 4px #000;
     z-index:6; pointer-events:none;
   }
-  #regenIndicator {
-    position:absolute; top:70px; left:50%; transform:translateX(-50%);
-    font-size:10px; color:#6f6; opacity:0; z-index:5; pointer-events:none;
-    transition:opacity 0.3s; text-shadow:0 0 6px #0f0;
-  }
-  #regenIndicator.active { opacity:1; }
+  
   #xpBarWrap { position:absolute; bottom:0; left:0; right:0; height:8px; background:rgba(0,0,0,0.7); z-index:5; }
   #xpBar { height:100%; width:0%; background:linear-gradient(90deg,#6cf,#b8a0ff,#f6c); transition:width 0.2s; box-shadow:0 0 12px #b8a0ff; }
   #xpText { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); font-size:9px; opacity:0.7; z-index:5; }
@@ -122,7 +129,7 @@
     display:none; z-index:20; align-items:center; justify-content:center;
   }
   
-  /* Responsive para móvil horizontal */
+  /* Responsive */
   @media (max-height: 500px) {
     h1 { font-size:24px; }
     h2 { font-size:14px; margin:6px 0 3px; }
@@ -138,14 +145,20 @@
 <body>
 <div id="wrap">
   <div id="hud">
+    <div class="stat"><span class="label">OLEADA</span><span class="val" id="uiWave">1</span></div>
     <div class="stat"><span class="label">NIVEL</span><span class="val" id="uiLevel">1</span></div>
-    <div class="stat"><span class="label">TIEMPO</span><span class="val" id="uiTime">0:00</span></div>
     <div class="stat"><span class="label">BAJAS</span><span class="val" id="uiKills">0</span></div>
     <div class="stat"><span class="label">COFRES</span><span class="val" id="uiChests">0</span></div>
   </div>
+  
+  <div id="waveDisplay">
+    <div id="waveText">OLEADA 1</div>
+    <div id="enemiesLeft">Enemigos: 0</div>
+  </div>
+
   <div id="hpBarWrap"><div id="hpBar"></div></div>
   <div id="hpText">100 / 100</div>
-  <div id="regenIndicator">✚ Regenerando vida...</div>
+  
   <div id="xpBarWrap"><div id="xpBar"></div></div>
   <div id="xpText">Nivel 1 · 0/5 XP</div>
   
@@ -304,18 +317,18 @@ function makeRobeTexture(color1, color2){
 
 // ==================== MAPAS ====================
 const MAPS = [
-  { id:'forest', name:'Bosque Ancestral', icon:'🌲', desc:'Orcos verdes y lobos salvajes.', groundColor: 0x2a4a2a, groundBase: '#2a4a2a', groundAccent: '#4a6a4a', groundPattern: 'grass', fogColor: 0x0a1420, fogNear: 32, fogFar: 75, ambientColor: 0x404060, skyColor: 0x0a1420, lightColor: 0xffeedd, trees: 25, treeColor: 0x2a8a3a, rocks: 0, enemyTheme: 'orc', enemyColors: { grunt:0x66aa44, scout:0x88cc55, shaman:0x55aa88, brute:0x448844 }, bossColor: 0xaa2222 },
-  { id:'desert', name:'Desierto Ardiente', icon:'🏜️', desc:'Momias y escorpiones.', groundColor: 0xd4b076, groundBase: '#c4a066', groundAccent: '#a08040', groundPattern: 'sand', fogColor: 0x4a3010, fogNear: 30, fogFar: 70, ambientColor: 0x604030, skyColor: 0x8a6a40, lightColor: 0xffddaa, trees: 0, treeColor: 0x8a6a30, rocks: 15, enemyTheme: 'mummy', enemyColors: { grunt:0xd4b076, scout:0xe8c890, shaman:0xa08040, brute:0x8a6030 }, bossColor: 0xaa6633 },
-  { id:'snow', name:'Cumbres Heladas', icon:'❄️', desc:'Gigantes de hielo y yetis.', groundColor: 0xe8eef5, groundBase: '#d8e0f0', groundAccent: '#a8c8e0', groundPattern: 'snow', fogColor: 0x8090b0, fogNear: 35, fogFar: 80, ambientColor: 0x6080a0, skyColor: 0x90a8c8, lightColor: 0xcce0ff, trees: 18, treeColor: 0x2a4a3a, rocks: 5, enemyTheme: 'ice', enemyColors: { grunt:0x88ccdd, scout:0xaaddff, shaman:0x66aacc, brute:0x4488aa }, bossColor: 0x2288cc },
-  { id:'castle', name:'Castillo Maldito', icon:'🏰', desc:'Esqueletos y caballeros oscuros.', groundColor: 0x4a4a5a, groundBase: '#3a3a4a', groundAccent: '#1a1a2a', groundPattern: 'stone', fogColor: 0x1a1020, fogNear: 28, fogFar: 65, ambientColor: 0x303050, skyColor: 0x1a1020, lightColor: 0xaa88cc, trees: 0, treeColor: 0x2a2a3a, rocks: 20, enemyTheme: 'skeleton', enemyColors: { grunt:0xd8d8c0, scout:0xe8e8d0, shaman:0xaa88cc, brute:0x808090 }, bossColor: 0x662266 },
+  { id:'forest', name:'Bosque Ancestral', icon:'🌲', desc:'Orcos verdes.', groundColor: 0x2a4a2a, groundBase: '#2a4a2a', groundAccent: '#4a6a4a', groundPattern: 'grass', fogColor: 0x0a1420, fogNear: 32, fogFar: 75, ambientColor: 0x404060, skyColor: 0x0a1420, lightColor: 0xffeedd, trees: 25, treeColor: 0x2a8a3a, rocks: 0, enemyTheme: 'orc', enemyColors: { grunt:0x66aa44, scout:0x88cc55, shaman:0x55aa88, brute:0x448844 }, bossColor: 0xaa2222 },
+  { id:'desert', name:'Desierto Ardiente', icon:'🏜️', desc:'Momias.', groundColor: 0xd4b076, groundBase: '#c4a066', groundAccent: '#a08040', groundPattern: 'sand', fogColor: 0x4a3010, fogNear: 30, fogFar: 70, ambientColor: 0x604030, skyColor: 0x8a6a40, lightColor: 0xffddaa, trees: 0, treeColor: 0x8a6a30, rocks: 15, enemyTheme: 'mummy', enemyColors: { grunt:0xd4b076, scout:0xe8c890, shaman:0xa08040, brute:0x8a6030 }, bossColor: 0xaa6633 },
+  { id:'snow', name:'Cumbres Heladas', icon:'❄️', desc:'Gigantes de hielo.', groundColor: 0xe8eef5, groundBase: '#d8e0f0', groundAccent: '#a8c8e0', groundPattern: 'snow', fogColor: 0x8090b0, fogNear: 35, fogFar: 80, ambientColor: 0x6080a0, skyColor: 0x90a8c8, lightColor: 0xcce0ff, trees: 18, treeColor: 0x2a4a3a, rocks: 5, enemyTheme: 'ice', enemyColors: { grunt:0x88ccdd, scout:0xaaddff, shaman:0x66aacc, brute:0x4488aa }, bossColor: 0x2288cc },
+  { id:'castle', name:'Castillo Maldito', icon:'🏰', desc:'Esqueletos.', groundColor: 0x4a4a5a, groundBase: '#3a3a4a', groundAccent: '#1a1a2a', groundPattern: 'stone', fogColor: 0x1a1020, fogNear: 28, fogFar: 65, ambientColor: 0x303050, skyColor: 0x1a1020, lightColor: 0xaa88cc, trees: 0, treeColor: 0x2a2a3a, rocks: 20, enemyTheme: 'skeleton', enemyColors: { grunt:0xd8d8c0, scout:0xe8e8d0, shaman:0xaa88cc, brute:0x808090 }, bossColor: 0x662266 },
 ];
 
 // ==================== DIFICULTADES ====================
 const DIFFICULTIES = [
-  { id:'easy', name:'FÁCIL', color:'#6f6', hpMult:0.7, speedMult:0.8, dmgMult:0.6, spawnMult:0.7, xpMult:1.3, regenRate: 3.5, desc:'Enemigos débiles, mucha regeneración.' },
-  { id:'normal', name:'NORMAL', color:'#6cf', hpMult:1.0, speedMult:1.0, dmgMult:1.0, spawnMult:1.0, xpMult:1.0, regenRate: 2.0, desc:'La experiencia equilibrada.' },
-  { id:'hard', name:'DIFÍCIL', color:'#fa6', hpMult:1.4, speedMult:1.15, dmgMult:1.4, spawnMult:1.3, xpMult:0.85, regenRate: 1.0, desc:'Hordas más grandes y letales.' },
-  { id:'nightmare', name:'PESADILLA', color:'#f6c', hpMult:2.0, speedMult:1.3, dmgMult:1.8, spawnMult:1.6, xpMult:0.7, regenRate: 0.5, desc:'Solo para valientes.' },
+  { id:'easy', name:'FÁCIL', color:'#6f6', hpMult:0.7, speedMult:0.8, dmgMult:0.6, spawnMult:0.7, xpMult:1.3, baseEnemies: 5, enemyInc: 2, desc:'Fácil. Enemigos débiles. Vida al 100% al acabar oleada.' },
+  { id:'normal', name:'NORMAL', color:'#6cf', hpMult:1.0, speedMult:1.0, dmgMult:1.0, spawnMult:1.0, xpMult:1.0, baseEnemies: 8, enemyInc: 3, desc:'Normal. Equilibrado. Vida al 100% al acabar oleada.' },
+  { id:'hard', name:'DIFÍCIL', color:'#fa6', hpMult:1.4, speedMult:1.15, dmgMult:1.4, spawnMult:1.3, xpMult:0.85, baseEnemies: 12, enemyInc: 4, desc:'Difícil. Más enemigos. Vida al 100% al acabar oleada.' },
+  { id:'nightmare', name:'PESADILLA', color:'#f6c', hpMult:2.0, speedMult:1.3, dmgMult:1.8, spawnMult:1.6, xpMult:0.7, baseEnemies: 15, enemyInc: 5, desc:'Pesadilla. Hordas masivas. Vida al 100% al acabar oleada.' },
 ];
 
 // ==================== PERSONAJES ====================
@@ -340,10 +353,16 @@ let selectedChar = CHARACTERS[0];
 let gameState = 'menu';
 let player = null;
 let enemies = [], projectiles = [], gems = [], particles = [], chests = [];
-let boss = null;
-let kills = 0, elapsed = 0, spawnTimer = 0, chestTimer = 0, level = 1, xp = 0, xpNext = 5;
-let nextBossAt = 60, upgradeChoices = null, chestsOpened = 0;
-let regenAccum = 0;
+let kills = 0, elapsed = 0, chestTimer = 0, level = 1, xp = 0, xpNext = 5;
+let upgradeChoices = null, chestsOpened = 0;
+
+// ESTADO DE OLEADAS
+let currentWave = 0;
+let enemiesToSpawn = 0;
+let waveState = 'idle'; // 'idle' (esperando), 'active' (combate), 'between' (transición)
+let waveTimer = 0; // tiempo para empezar la siguiente oleada
+let spawnTimer = 0;
+let isBossWave = false;
 
 // Joystick táctil
 let joystickActive = false;
@@ -607,7 +626,6 @@ function buildMageModel(){
   return g;
 }
 
-// ==================== FÁBRICA DE PERSONAJE ====================
 function createPlayer(character){
   let mesh;
   if(character.id === 'monkey') mesh = buildMonkeyModel();
@@ -671,6 +689,7 @@ function createEnemyMesh(type, map){
   }
   const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.15, 12, 1, true), leatherMat); belt.position.y = 0.4; g.add(belt);
   for(const dx of [-0.22, 0.22]){ const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.4, 8), skinMat); leg.position.set(dx, 0.2, 0); leg.castShadow = true; g.add(leg); }
+  
   if(map.enemyTheme === 'mummy'){
     for(let y=0.4; y<1.6; y+=0.25){ const band = new THREE.Mesh(new THREE.CylinderGeometry(0.62 - y*0.05, 0.62 - y*0.05, 0.08, 12, 1, true), new THREE.MeshStandardMaterial({ color:0xe8d8b0, roughness:0.9 })); band.position.y = y; g.add(band); }
   } else if(map.enemyTheme === 'ice'){
@@ -682,40 +701,50 @@ function createEnemyMesh(type, map){
   return g;
 }
 
-function spawnEnemy(){
-  const t = elapsed < 15 ? 'grunt' : elapsed < 30 ? (Math.random()<0.6?'grunt':'scout') : elapsed < 50 ? (Math.random()<0.4?'grunt':Math.random()<0.6?'scout':'shaman') : (Math.random()<0.3?'grunt':Math.random()<0.3?'scout':Math.random()<0.5?'shaman':'brute');
-  const def = ENEMY_BASE[t];
-  const ang = rand(0, Math.PI*2); const radius = ARENA * 0.95;
-  const x = Math.cos(ang)*radius + rand(-3,3); const z = Math.sin(ang)*radius + rand(-3,3);
-  const mesh = createEnemyMesh(t, selectedMap);
-  mesh.position.set(x, 0, z); enemyGroup.add(mesh);
-  const d = selectedDiff; const hb = createHealthBar(0xff2222);
-  enemies.push({ mesh, type:t, def, x, z, r:def.r, y:0, hp:def.hp * d.hpMult, maxHp:def.hp * d.hpMult, speed:def.speed * d.speedMult, xp:def.xp * d.xpMult, dmg:def.dmg * d.dmgMult, score:def.score, hitFlash:0, bobPhase: rand(0, Math.PI*2), isBoss:false, healthBar: hb, shootCd:0 });
-}
+function spawnEnemy(isBoss = false){
+  if(isBoss){
+    const d = selectedDiff; const hp = (600 + (currentWave/5)*250) * d.hpMult;
+    const g = new THREE.Group();
+    const bossColorHex = selectedMap.bossColor;
+    const bossTex = makeSkinTexture('#' + bossColorHex.toString(16).padStart(6,'0'), 20);
+    const skinMat = new THREE.MeshStandardMaterial({ map: bossTex, color:bossColorHex, roughness:0.7, metalness:0.2 });
+    const armorMat = new THREE.MeshStandardMaterial({ color:0x333333, roughness:0.3, metalness:0.9, emissive:0x110000 });
+    const goldMat = new THREE.MeshStandardMaterial({ color:0xffd93d, roughness:0.3, metalness:0.9, emissive:0x442200, emissiveIntensity:0.3 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(1.3, 16, 12), skinMat); body.position.y = 1.8; body.scale.set(1, 1.2, 0.9); body.castShadow = true; g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 10), skinMat); head.position.y = 3.5; head.scale.set(1, 1, 1.1); head.castShadow = true; g.add(head);
+    for(const dx of [-0.35, 0.35]){ const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color:0xff2200 })); eye.position.set(dx, 3.6, 0.75); g.add(eye); }
+    for(const dx of [-0.3, 0.3]){ const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 5), new THREE.MeshStandardMaterial({ color:0xffffdd })); tusk.position.set(dx, 3.1, 0.7); tusk.rotation.x = Math.PI; g.add(tusk); }
+    for(const dx of [-0.6, 0.6]){ const horn = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 6), new THREE.MeshStandardMaterial({ color:0x333333 })); horn.position.set(dx, 4.1, 0); horn.rotation.z = dx > 0 ? -0.5 : 0.5; g.add(horn); }
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.35, 8), goldMat); crown.position.y = 4.35; g.add(crown);
+    for(let i=0;i<6;i++){ const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), goldMat); const a = (i/6) * Math.PI*2; spike.position.set(Math.cos(a)*0.65, 4.65, Math.sin(a)*0.65); g.add(spike); }
+    for(const dx of [-1.2, 1.2]){ const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 1.3, 8), skinMat); arm.position.set(dx, 1.9, 0.2); arm.rotation.z = dx > 0 ? -0.3 : 0.3; arm.castShadow = true; g.add(arm); }
+    const haft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.0, 6), new THREE.MeshStandardMaterial({ color:0x4a2a10 })); haft.position.set(1.5, 1.9, 0.3); haft.rotation.z = 0.3; g.add(haft);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.1), armorMat); blade.position.set(1.85, 2.6, 0.3); blade.rotation.z = 0.3; blade.castShadow = true; g.add(blade);
+    for(const dx of [-0.5, 0.5]){ const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.9, 8), skinMat); leg.position.set(dx, 0.5, 0); leg.castShadow = true; g.add(leg); }
+    g.position.set(0, 0, -ARENA*0.9); enemyGroup.add(g);
+    const hb = createHealthBar(0xff2222);
+    const dmgMult = selectedDiff.dmgMult * (1 + (currentWave/5)*0.2);
+    enemies.push({ mesh: g, type:'boss', x:0, z:-ARENA*0.9, r:2.0, y:0, hp, maxHp:hp, speed:2.2 * selectedDiff.speedMult, xp:25, dmg:25 * dmgMult, score:500, hitFlash:0, bobPhase:0, shootCd:1.5, isBoss:true, healthBar: hb });
+  } else {
+    const t = currentWave < 2 ? 'grunt' : currentWave < 4 ? (Math.random()<0.6?'grunt':'scout') : currentWave < 6 ? (Math.random()<0.4?'grunt':Math.random()<0.6?'scout':'shaman') : (Math.random()<0.3?'grunt':Math.random()<0.3?'scout':Math.random()<0.5?'shaman':'brute');
+    const def = ENEMY_BASE[t];
+    const ang = rand(0, Math.PI*2); const radius = ARENA * 0.95;
+    const x = Math.cos(ang)*radius + rand(-3,3); const z = Math.sin(ang)*radius + rand(-3,3);
+    const mesh = createEnemyMesh(t, selectedMap);
+    mesh.position.set(x, 0, z); enemyGroup.add(mesh);
+    
+    // Escalado de dificultad por oleada
+    const waveHpMult = 1 + (currentWave - 1) * 0.15;
+    const waveDmgMult = 1 + (currentWave - 1) * 0.1;
+    const waveSpeedMult = 1 + (currentWave - 1) * 0.03;
+    
+    const finalHp = def.hp * selectedDiff.hpMult * waveHpMult;
+    const finalDmg = def.dmg * selectedDiff.dmgMult * waveDmgMult;
+    const finalSpeed = def.speed * selectedDiff.speedMult * waveSpeedMult;
 
-function spawnBossOrc(){
-  const d = selectedDiff; const hp = (600 + level*120) * d.hpMult;
-  const g = new THREE.Group();
-  const bossColorHex = selectedMap.bossColor;
-  const bossTex = makeSkinTexture('#' + bossColorHex.toString(16).padStart(6,'0'), 20);
-  const skinMat = new THREE.MeshStandardMaterial({ map: bossTex, color:bossColorHex, roughness:0.7, metalness:0.2 });
-  const armorMat = new THREE.MeshStandardMaterial({ color:0x333333, roughness:0.3, metalness:0.9, emissive:0x110000 });
-  const goldMat = new THREE.MeshStandardMaterial({ color:0xffd93d, roughness:0.3, metalness:0.9, emissive:0x442200, emissiveIntensity:0.3 });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1.3, 16, 12), skinMat); body.position.y = 1.8; body.scale.set(1, 1.2, 0.9); body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 10), skinMat); head.position.y = 3.5; head.scale.set(1, 1, 1.1); head.castShadow = true; g.add(head);
-  for(const dx of [-0.35, 0.35]){ const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color:0xff2200 })); eye.position.set(dx, 3.6, 0.75); g.add(eye); }
-  for(const dx of [-0.3, 0.3]){ const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 5), new THREE.MeshStandardMaterial({ color:0xffffdd })); tusk.position.set(dx, 3.1, 0.7); tusk.rotation.x = Math.PI; g.add(tusk); }
-  for(const dx of [-0.6, 0.6]){ const horn = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 6), new THREE.MeshStandardMaterial({ color:0x333333 })); horn.position.set(dx, 4.1, 0); horn.rotation.z = dx > 0 ? -0.5 : 0.5; g.add(horn); }
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.35, 8), goldMat); crown.position.y = 4.35; g.add(crown);
-  for(let i=0;i<6;i++){ const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), goldMat); const a = (i/6) * Math.PI*2; spike.position.set(Math.cos(a)*0.65, 4.65, Math.sin(a)*0.65); g.add(spike); }
-  for(const dx of [-1.2, 1.2]){ const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 1.3, 8), skinMat); arm.position.set(dx, 1.9, 0.2); arm.rotation.z = dx > 0 ? -0.3 : 0.3; arm.castShadow = true; g.add(arm); }
-  const haft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.0, 6), new THREE.MeshStandardMaterial({ color:0x4a2a10 })); haft.position.set(1.5, 1.9, 0.3); haft.rotation.z = 0.3; g.add(haft);
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.1), armorMat); blade.position.set(1.85, 2.6, 0.3); blade.rotation.z = 0.3; blade.castShadow = true; g.add(blade);
-  for(const dx of [-0.5, 0.5]){ const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.9, 8), skinMat); leg.position.set(dx, 0.5, 0); leg.castShadow = true; g.add(leg); }
-  g.position.set(0, 0, -ARENA*0.9); enemyGroup.add(g);
-  const hb = createHealthBar(0xff2222);
-  boss = { mesh: g, type:'boss', x:0, z:-ARENA*0.9, r:2.0, y:0, hp, maxHp:hp, speed:2.0 * d.speedMult, xp:25, dmg:25 * d.dmgMult, score:500, hitFlash:0, bobPhase:0, shootCd:1.5, isBoss:true, healthBar: hb };
-  enemies.push(boss);
+    const hb = createHealthBar(0xff2222);
+    enemies.push({ mesh, type:t, def, x, z, r:def.r, y:0, hp:finalHp, maxHp:finalHp, speed:finalSpeed, xp:def.xp * selectedDiff.xpMult, dmg:finalDmg, score:def.score, hitFlash:0, bobPhase: rand(0, Math.PI*2), isBoss:false, healthBar: hb, shootCd:0 });
+  }
 }
 
 // ==================== COFRES ====================
@@ -828,7 +857,7 @@ function showMenu(){
   let html = `
     <div id="menuContent">
       <h1>⚔️ BONK SURVIVORS 3D</h1>
-      <p style="font-size:12px;margin-bottom:5px">Elige personaje, mapa y dificultad.</p>
+      <p style="font-size:12px;margin-bottom:5px">Sobrevive a las oleadas. La vida se regenera al 100% al terminar cada una.</p>
       <h2>🎭 ELIGE PERSONAJE</h2>
       <div class="cards" id="charCards">
   `;
@@ -885,7 +914,7 @@ function showMenu(){
 // ==================== FLUJO ====================
 function clearScene(){
   for(const e of enemies){ enemyGroup.remove(e.mesh); if(e.healthBar) scene.remove(e.healthBar.group); }
-  enemies = []; boss = null;
+  enemies = []; 
   for(const p of projectiles){ projGroup.remove(p.mesh); p.mat.dispose(); }
   projectiles = [];
   for(const g of gems){ gemGroup.remove(g.mesh); g.mat.dispose(); }
@@ -901,10 +930,50 @@ function clearScene(){
 
 function startGame(){
   clearScene(); applyMapToScene(selectedMap); player = createPlayer(selectedChar);
-  kills = 0; elapsed = 0; spawnTimer = 0; chestTimer = 3;
+  kills = 0; elapsed = 0; chestTimer = 5;
   level = 1; xp = 0; xpNext = 5;
-  nextBossAt = 60; upgradeChoices = null; chestsOpened = 0; regenAccum = 0;
+  upgradeChoices = null; chestsOpened = 0;
+  currentWave = 0;
+  startNextWave();
   gameState = 'playing'; document.getElementById('overlay').classList.add('hidden'); updateUI();
+}
+
+function startNextWave(){
+  currentWave++;
+  isBossWave = (currentWave % 5 === 0);
+  
+  if(isBossWave){
+    enemiesToSpawn = 1;
+    showFloatingText(player.x, 3, player.z, '¡OLEADA DE JEFE!', '#ff3366');
+    beep(150, 0.5, 'sawtooth', 0.1, 80);
+  } else {
+    // Fórmula de escalado de enemigos
+    enemiesToSpawn = Math.floor(selectedDiff.baseEnemies + (currentWave - 1) * selectedDiff.enemyInc);
+    showFloatingText(player.x, 3, player.z, `OLEADA ${currentWave}`, '#ffd93d');
+    beep(600, 0.2, 'sine', 0.08);
+  }
+  
+  waveState = 'active';
+  spawnTimer = 0;
+  updateUI();
+}
+
+function waveCleared(){
+  waveState = 'between';
+  waveTimer = 3.0; // 3 segundos para empezar la siguiente
+  
+  // CURACIÓN AL 100% POR TERMINAR OLEADA
+  player.hp = player.maxHp;
+  updateUI();
+  
+  showFloatingText(player.x, 3, player.z, '¡OLEADA SUPERADA!', '#44ff44');
+  showFloatingText(player.x, 2, player.z, 'VIDA RESTAURADA', '#44ff44');
+  beep(600, 0.15, 'sine', 0.1);
+  setTimeout(()=>beep(900, 0.15, 'sine', 0.1), 100);
+  setTimeout(()=>beep(1200, 0.2, 'sine', 0.1), 200);
+
+  document.getElementById('waveText').textContent = `OLEADA ${currentWave} COMPLETADA`;
+  document.getElementById('waveText').style.color = '#44ff44';
 }
 
 function pickUpgrade(i){
@@ -937,11 +1006,10 @@ function gameOver(){
   gameState = 'gameover';
   const ov = document.getElementById('overlay');
   ov.innerHTML = `
-    <h1 style="font-size:32px;background:linear-gradient(135deg,#f66,#fa6)">${selectedChar.icon} ${selectedChar.name.toUpperCase()} HA CAÍDO</h1>
-    <p>Mapa: <strong style="color:#ffd93d">${selectedMap.icon} ${selectedMap.name}</strong></p>
-    <p>Dificultad: <strong style="color:${selectedDiff.color}">${selectedDiff.name}</strong></p>
+    <h1 style="font-size:32px;background:linear-gradient(135deg,#f66,#fa6)">${selectedChar.icon} HAS CAÍDO</h1>
+    <p>Llegaste a la: <strong style="color:#ffd93d">Oleada ${currentWave}</strong></p>
+    <p>Mapa: <strong>${selectedMap.icon} ${selectedMap.name}</strong> · Dificultad: <strong>${selectedDiff.name}</strong></p>
     <p>Nivel: <strong style="color:#b8a0ff">${level}</strong> · Bajas: <strong style="color:#ffd93d">${kills}</strong> · Cofres: <strong style="color:#ffaa00">${chestsOpened}</strong></p>
-    <p>Tiempo: <strong>${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')}</strong></p>
     <button class="btnStart" id="btnRetry" style="margin-top:15px">🔄 REINTENTAR</button>
     <button class="btnStart" id="btnMenu" style="margin-top:8px;background:linear-gradient(135deg,#4a3a8a,#2a2450);color:#fff">🏠 MENÚ</button>
   `;
@@ -952,11 +1020,23 @@ function gameOver(){
 }
 
 function updateUI(){
+  document.getElementById('uiWave').textContent = currentWave;
   document.getElementById('uiLevel').textContent = level;
-  const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
-  document.getElementById('uiTime').textContent = `${m}:${String(s).padStart(2,'0')}`;
   document.getElementById('uiKills').textContent = kills;
   document.getElementById('uiChests').textContent = chestsOpened;
+  
+  if(gameState === 'playing'){
+    document.getElementById('waveText').textContent = isBossWave ? '¡JEFE!' : `OLEADA ${currentWave}`;
+    document.getElementById('waveText').style.color = isBossWave ? '#ff3366' : '#fff';
+    
+    if(waveState === 'active'){
+      const left = enemies.filter(e => e.hp > 0).length + enemiesToSpawn;
+      document.getElementById('enemiesLeft').textContent = `Enemigos restantes: ${left}`;
+    } else if(waveState === 'between'){
+      document.getElementById('enemiesLeft').textContent = 'Preparando siguiente oleada...';
+    }
+  }
+
   if(player){
     const ratio = player.hp / player.maxHp;
     document.getElementById('hpBar').style.width = (ratio*100)+'%';
@@ -987,14 +1067,14 @@ function killEnemy(e){
   spawnBurst(e.x, 1, e.z, e.isBoss ? 0xff3366 : selectedMap.enemyColors.grunt, e.isBoss ? 40 : 12, e.isBoss ? 12 : 6);
   if(e.isBoss){
     for(let k=0;k<8;k++) spawnGem(e.x + rand(-2,2), e.z + rand(-2,2), 5, 0xffa64d);
-    beep(200,0.4,'sawtooth',0.1,80); showFloatingText(e.x, 3, e.z, '¡JEFE DERROTADO!', '#ffd93d'); boss = null; spawnChest();
+    beep(200,0.4,'sawtooth',0.1,80); showFloatingText(e.x, 3, e.z, '¡JEFE DERROTADO!', '#ffd93d'); spawnChest();
   } else {
     spawnGem(e.x, e.z, e.xp); beep(300,0.05,'square',0.03,400); if(Math.random() < 0.05) spawnChest();
   }
   enemyGroup.remove(e.mesh); if(e.healthBar) scene.remove(e.healthBar.group);
 }
 
-// ==================== INPUT TÁCTIL Y TECLADO ====================
+// ==================== INPUT ====================
 const keys = {};
 function onKeyDown(e){
   keys[e.key] = true;
@@ -1010,14 +1090,12 @@ function onKeyUp(e){ keys[e.key] = false; }
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 
-// Detección de dispositivo táctil
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (isTouch) {
   joystickEl.style.display = 'block';
   document.getElementById('btnFullscreen').style.display = 'flex';
 }
 
-// Lógica del Joystick
 function updateJoystick(clientX, clientY) {
   const rect = joystickEl.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
@@ -1030,29 +1108,13 @@ function updateJoystick(clientX, clientY) {
   joystickVector.x = dx / maxDist;
   joystickVector.y = dy / maxDist;
 }
+joystickEl.addEventListener('touchstart', (e) => { e.preventDefault(); joystickActive = true; updateJoystick(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+joystickEl.addEventListener('touchmove', (e) => { e.preventDefault(); if (!joystickActive) return; updateJoystick(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+joystickEl.addEventListener('touchend', () => { joystickActive = false; joystickVector.x = 0; joystickVector.y = 0; knobEl.style.transform = 'translate(-50%, -50%)'; });
 
-joystickEl.addEventListener('touchstart', (e) => {
-  e.preventDefault(); joystickActive = true;
-  updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-
-joystickEl.addEventListener('touchmove', (e) => {
-  e.preventDefault(); if (!joystickActive) return;
-  updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-
-joystickEl.addEventListener('touchend', () => {
-  joystickActive = false; joystickVector.x = 0; joystickVector.y = 0;
-  knobEl.style.transform = 'translate(-50%, -50%)';
-});
-
-// Botón Fullscreen
 document.getElementById('btnFullscreen').addEventListener('click', () => {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(err => console.log(err));
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-  }
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+  else if (document.exitFullscreen) document.exitFullscreen();
 });
 
 // ==================== UPDATE ====================
@@ -1089,31 +1151,19 @@ function update(dt){
   }
 
   if(gameState !== 'playing' || !player) return;
-  elapsed += dt;
 
-  // Regeneración
-  if(player.hp < player.maxHp && player.hp > 0){
-    const regen = selectedDiff.regenRate; regenAccum += regen * dt;
-    if(regenAccum >= 1){ const heal = Math.floor(regenAccum); player.hp = Math.min(player.hp + heal, player.maxHp); regenAccum -= heal; }
-    document.getElementById('regenIndicator').classList.add('active');
-  } else {
-    document.getElementById('regenIndicator').classList.remove('active'); regenAccum = 0;
-  }
-
-  // Movimiento (Joystick + Teclado)
+  // Movimiento
   let mx = joystickVector.x;
   let mz = joystickVector.y;
   if(keys['w']||keys['W']||keys['ArrowUp']) mz-=1;
   if(keys['s']||keys['S']||keys['ArrowDown']) mz+=1;
   if(keys['a']||keys['A']||keys['ArrowLeft']) mx-=1;
   if(keys['d']||keys['D']||keys['ArrowRight']) mx+=1;
-
   const len = Math.hypot(mx,mz);
   if(len>0.1){
-    mx/=Math.max(1, len); mz/=Math.max(1, len); // Normalizar manteniendo la fuerza del joystick
+    mx/=Math.max(1, len); mz/=Math.max(1, len);
     const moveSpeed = player.speed * Math.min(1, len);
-    player.x += mx * moveSpeed * dt;
-    player.z += mz * moveSpeed * dt;
+    player.x += mx * moveSpeed * dt; player.z += mz * moveSpeed * dt;
     player.mesh.rotation.y = Math.atan2(mx, mz);
     player.walkPhase += dt * 12;
     player.mesh.position.y = Math.abs(Math.sin(player.walkPhase)) * 0.08;
@@ -1126,10 +1176,9 @@ function update(dt){
 
   player.aura.scale.setScalar(1 + Math.sin(t*4)*0.15);
   player.aura.material.opacity = 0.25 + Math.sin(t*4)*0.15;
-  player.mesh.position.x = player.x;
-  player.mesh.position.z = player.z;
+  player.mesh.position.x = player.x; player.mesh.position.z = player.z;
 
-  // Animaciones
+  // Animaciones de personajes
   if(selectedChar.id === 'dragon'){
     if(player.mesh.userData.wingL && player.mesh.userData.wingR){
       const flap = Math.sin(t*6) * 0.3;
@@ -1151,7 +1200,6 @@ function update(dt){
   player.healthBar.group.lookAt(camera.position);
   updateHealthBar(player.healthBar, player.hp / player.maxHp);
 
-  // Cámara
   camera.position.x += (player.x + CAM_OFFSET.x - camera.position.x) * Math.min(dt*6, 1);
   camera.position.y += (CAM_OFFSET.y - camera.position.y) * Math.min(dt*6, 1);
   camera.position.z += (player.z + CAM_OFFSET.z - camera.position.z) * Math.min(dt*6, 1);
@@ -1161,15 +1209,31 @@ function update(dt){
   player.fireCd -= dt;
   if(player.fireCd <= 0){ fireProjectiles(); player.fireCd = player.fireRate; }
 
-  // Spawns
-  spawnTimer -= dt;
-  const spawnInterval = Math.max(0.13, 0.7 - elapsed*0.005) / selectedDiff.spawnMult;
-  if(spawnTimer <= 0){ if(!boss) spawnEnemy(); spawnTimer = spawnInterval * rand(0.7,1.3); }
-  if(!boss && elapsed >= nextBossAt){ spawnBossOrc(); nextBossAt += 60; }
+  // LÓGICA DE OLEADAS
+  if(waveState === 'active'){
+    spawnTimer -= dt;
+    if(enemiesToSpawn > 0 && spawnTimer <= 0){
+      if(isBossWave) spawnEnemy(true);
+      else spawnEnemy(false);
+      enemiesToSpawn--;
+      // Spawnrate acelera con las oleadas
+      const spawnInterval = Math.max(0.15, 0.8 - currentWave * 0.05);
+      spawnTimer = spawnInterval;
+    }
+    // Comprobar si la oleada terminó (no quedan enemigos vivos ni por spawnear)
+    if(enemiesToSpawn === 0 && enemies.filter(e=>e.hp>0).length === 0){
+      waveCleared();
+    }
+  } else if(waveState === 'between'){
+    waveTimer -= dt;
+    if(waveTimer <= 0){
+      startNextWave();
+    }
+  }
 
+  // Cofres temporales
   chestTimer -= dt;
-  if(chestTimer <= 0){ if(chests.filter(c=>!c.open).length < 3) spawnChest(); chestTimer = rand(8, 14); }
-
+  if(chestTimer <= 0){ if(chests.filter(c=>!c.open).length < 2) spawnChest(); chestTimer = rand(10, 18); }
   for(let i=chests.length-1;i>=0;i--){
     const c = chests[i];
     if(c.open){ if(c.openTimer <= 0){ chestGroup.remove(c.mesh); chests.splice(i,1); } continue; }
@@ -1275,7 +1339,6 @@ function update(dt){
   updateUI();
 }
 
-// ==================== LOOP ====================
 const CAM_OFFSET = new THREE.Vector3(0, 22, 16);
 let last = performance.now();
 function loop(now){
@@ -1291,7 +1354,7 @@ initThree();
 showMenu();
 requestAnimationFrame(loop);
 
-console.log('[BONK] Mobile-Ready cargado.');
+console.log('[BONK] Wave Defense cargado.');
 </script>
 </body>
 </html>
