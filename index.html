@@ -132,13 +132,6 @@
   }
   .diffBtn.selected { border-color:#ffd93d; background:#2a2450; color:#ffd93d; }
   
-  /* ZONA TÁCTIL PARA EL JOYSTICK DINÁMICO */
-  #touchZone {
-    position:absolute; top:0; left:0; width:50%; height:100%;
-    z-index:19; display:none; touch-action:none;
-  }
-  
-  /* JOYSTICK DINÁMICO */
   #joystick {
     position:absolute; width:120px; height:120px;
     background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.2);
@@ -162,6 +155,35 @@
     border-radius:8px; color:#fff; font-size:20px; cursor:pointer;
     display:none; z-index:20; align-items:center; justify-content:center;
   }
+
+  /* RANKING */
+  #rankingContent { max-width:600px; width:100%; }
+  .rank-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+  .rank-table th { background:rgba(138,170,255,0.2); padding:8px; border:1px solid #4a3a8a; color:#b8a0ff; }
+  .rank-table td { padding:8px; border:1px solid #2a2450; text-align:center; }
+  .rank-table tr:nth-child(even) { background:rgba(255,255,255,0.03); }
+  .rank-table tr.top1 td { color:#ffd93d; font-weight:bold; font-size:16px; }
+  .rank-table tr.top2 td { color:#c0c0c0; font-weight:bold; }
+  .rank-table tr.top3 td { color:#cd7f32; font-weight:bold; }
+  
+  /* MODAL INPUT */
+  #nameModal {
+    position:absolute; inset:0; background:rgba(0,0,0,0.85);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    z-index:30; opacity:0; pointer-events:none; transition:opacity 0.3s;
+  }
+  #nameModal.show { opacity:1; pointer-events:auto; }
+  #nameModal input {
+    margin-top:15px; padding:10px; font-size:18px; text-align:center;
+    border:2px solid #4a3a8a; border-radius:8px; background:#1e1e35; color:#fff;
+    outline:none; width:250px;
+  }
+  #nameModal input:focus { border-color:#8af; }
+  
+  #touchZone {
+    position:absolute; top:0; left:0; width:50%; height:100%;
+    z-index:19; display:none; touch-action:none;
+  }
   
   @media (max-height: 500px) {
     h1 { font-size:24px; }
@@ -177,6 +199,7 @@
     #hpBarWrap { width:180px; }
     .stat-row { min-width:80px; padding:2px 6px; }
     .stat-val { font-size:13px; }
+    .rank-table th, .rank-table td { padding:4px; font-size:11px; }
   }
 </style>
 </head>
@@ -212,6 +235,15 @@
   
   <button id="btnFullscreen">⛶</button>
   
+  <!-- MODAL PARA PONER EL NOMBRE -->
+  <div id="nameModal">
+    <h1 style="font-size:32px">¡HAS CAÍDO!</h1>
+    <p>Introduce tu nombre para el ranking:</p>
+    <input type="text" id="playerName" maxlength="12" placeholder="Tu nombre">
+    <button class="btnStart" id="btnSaveName" style="margin-top:15px">GUARDAR PUNTUACIÓN</button>
+  </div>
+
+  <!-- OVERLAY PRINCIPAL -->
   <div id="overlay"></div>
 </div>
 
@@ -230,6 +262,28 @@ const rand = (a,b) => Math.random()*(b-a)+a;
 const randInt = (a,b) => Math.floor(rand(a,b+1));
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const dist2 = (a,b) => (a.x-b.x)**2 + (a.z-b.z)**2;
+
+// ==================== RANKING (LocalStorage) ====================
+const RANKING_KEY = 'bonk_survivors_ranking';
+
+function getRankings() {
+  const data = localStorage.getItem(RANKING_KEY);
+  if (data) {
+    try { return JSON.parse(data); } catch(e) { return {}; }
+  }
+  return {};
+}
+
+function saveRanking(diffId, name, score, wave) {
+  const rankings = getRankings();
+  if (!rankings[diffId]) rankings[diffId] = [];
+  
+  rankings[diffId].push({ name, score, wave, date: Date.now() });
+  rankings[diffId].sort((a, b) => b.score - a.score); // Mayor puntuación primero
+  rankings[diffId] = rankings[diffId].slice(0, 10); // Top 10
+  
+  localStorage.setItem(RANKING_KEY, JSON.stringify(rankings));
+}
 
 // ==================== AUDIO ====================
 const AC = window.AudioContext || window.webkitAudioContext;
@@ -270,6 +324,8 @@ function makeGroundTexture(baseColor, accentColor, pattern = 'grass'){
       for(let i=0;i<400;i++){ c.fillStyle = `rgba(${parseInt(accentColor.slice(1,3),16)},${parseInt(accentColor.slice(3,5),16)},${parseInt(accentColor.slice(5,7),16)},0.3)`; c.fillRect(Math.random()*w, Math.random()*h, 2, 2); }
     } else if(pattern === 'snow'){
       for(let i=0;i<300;i++){ c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.arc(Math.random()*w, Math.random()*h, rand(1,3), 0, Math.PI*2); c.fill(); }
+    } else if(pattern === 'pumpkin'){
+      for(let i=0;i<50;i++){ c.fillStyle = accentColor; c.beginPath(); c.arc(Math.random()*w, Math.random()*h, rand(4,12), 0, Math.PI*2); c.fill(); }
     }
   }, 12);
 }
@@ -319,6 +375,10 @@ const MAPS = [
   { id:'desert', name:'Desierto Ardiente', icon:'🏜️', desc:'Momias.', groundColor: 0xd4b076, groundBase: '#c4a066', groundAccent: '#a08040', groundPattern: 'sand', fogColor: 0x4a3010, fogNear: 45, fogFar: 110, ambientColor: 0x604030, skyColor: 0x8a6a40, lightColor: 0xffddaa, trees: 0, treeColor: 0x8a6a30, rocks: 80, mountainColor: 0x5a2a10, mountainDist: 55, enemyTheme: 'mummy', enemyColors: { grunt:0xd4b076, scout:0xe8c890, shaman:0xa08040, brute:0x8a6030 }, bossColor: 0xaa6633 },
   { id:'snow', name:'Cumbres Heladas', icon:'❄️', desc:'Gigantes de hielo.', groundColor: 0xe8eef5, groundBase: '#d8e0f0', groundAccent: '#a8c8e0', groundPattern: 'snow', fogColor: 0x8090b0, fogNear: 55, fogFar: 130, ambientColor: 0x6080a0, skyColor: 0x90a8c8, lightColor: 0xcce0ff, trees: 80, treeColor: 0x2a4a3a, rocks: 40, mountainColor: 0x223344, mountainDist: 65, enemyTheme: 'ice', enemyColors: { grunt:0x88ccdd, scout:0xaaddff, shaman:0x66aacc, brute:0x4488aa }, bossColor: 0x2288cc },
   { id:'castle', name:'Castillo Maldito', icon:'🏰', desc:'Esqueletos.', groundColor: 0x4a4a5a, groundBase: '#3a3a4a', groundAccent: '#1a1a2a', groundPattern: 'stone', fogColor: 0x1a1020, fogNear: 40, fogFar: 100, ambientColor: 0x303050, skyColor: 0x1a1020, lightColor: 0xaa88cc, trees: 0, treeColor: 0x2a2a3a, rocks: 100, mountainColor: 0x1a0a1a, mountainDist: 50, enemyTheme: 'skeleton', enemyColors: { grunt:0xd8d8c0, scout:0xe8e8d0, shaman:0xaa88cc, brute:0x808090 }, bossColor: 0x662266 },
+  // NUEVOS MAPAS TEMÁTICOS
+  { id:'halloween', name:'Noche de Brujas', icon:'🎃', desc:'Calabazas y fantasmas.', groundColor: 0x1a0a1a, groundBase: '#1a0a1a', groundAccent: '#ff6600', groundPattern: 'pumpkin', fogColor: 0x2a0a0a, fogNear: 40, fogFar: 90, ambientColor: 0x604020, skyColor: 0x0a0005, lightColor: 0xffaa44, trees: 40, treeColor: 0x2a1a0a, rocks: 50, mountainColor: 0x1a0a05, mountainDist: 50, enemyTheme: 'halloween', enemyColors: { grunt:0xff8800, scout:0xffaa00, shaman:0xaa44ff, brute:0xcc2200 }, bossColor: 0xaa00ff },
+  { id:'christmas', name:'Navidad', icon:'🎄', desc:'Duendes y muñecos de nieve.', groundColor: 0xf0f8ff, groundBase: '#f0f8ff', groundAccent: '#aaccff', groundPattern: 'snow', fogColor: 0x88aaff, fogNear: 45, fogFar: 100, ambientColor: 0x405080, skyColor: 0x1a2a5a, lightColor: 0xcceeff, trees: 120, treeColor: 0x0a4a0a, rocks: 20, mountainColor: 0x2a3a5a, mountainDist: 55, enemyTheme: 'christmas', enemyColors: { grunt:0x00aa00, scout:0x00cc00, shaman:0xcc0000, brute:0xaa0000 }, bossColor: 0xff0000 },
+  { id:'easter', name:'Pascua', icon:'🐰', desc:'Conejos y huevos.', groundColor: 0x4a8a4a, groundBase: '#4a8a4a', groundAccent: '#ffccff', groundPattern: 'grass', fogColor: 0x88ccaa, fogNear: 50, fogFar: 110, ambientColor: 0x6080a0, skyColor: 0x88ccff, lightColor: 0xffffcc, trees: 100, treeColor: 0x4a9a4a, rocks: 30, mountainColor: 0x2a5a2a, mountainDist: 60, enemyTheme: 'easter', enemyColors: { grunt:0xff88ff, scout:0xffff88, shaman:0x88ffff, brute:0xff8888 }, bossColor: 0xffff00 },
 ];
 
 // ==================== DIFICULTADES ====================
@@ -366,7 +426,7 @@ let waveAnnounceTimer = 0;
 // Joystick variables
 let joystickActive = false;
 let joystickVector = { x: 0, y: 0 };
-let joystickOrigin = { x: 0, y: 0 }; // Dónde apareció el joystick
+let joystickOrigin = { x: 0, y: 0 };
 const joystickEl = document.getElementById('joystick');
 const knobEl = document.getElementById('joystickKnob');
 const touchZoneEl = document.getElementById('touchZone');
@@ -425,11 +485,11 @@ function applyMapToScene(map){
   outerGroundMat.map.repeat.set(20, 20);
   outerGround = new THREE.Mesh(outerGroundGeo, outerGroundMat); outerGround.rotation.x = -Math.PI/2; outerGround.position.y = -0.05; scene.add(outerGround);
 
-  const gridColor = map.id === 'snow' ? 0x88aacc : map.id === 'desert' ? 0x8a6a40 : map.id === 'castle' ? 0x4a3a6a : 0x3a5a3a;
+  const gridColor = map.id === 'snow' || map.id === 'christmas' ? 0x88aacc : map.id === 'desert' ? 0x8a6a40 : map.id === 'castle' ? 0x4a3a6a : map.id === 'halloween' ? 0xff6600 : map.id === 'easter' ? 0xff88ff : 0x3a5a3a;
   grid = new THREE.GridHelper(ARENA*2, 60, gridColor, gridColor); grid.position.y = 0.02; grid.material.opacity = 0.15; grid.material.transparent = true; scene.add(grid);
 
   decorGroup = new THREE.Group(); scene.add(decorGroup);
-  const trunkTex = makeSkinTexture('#5a3a1a', 20); const leavesTex = makeSkinTexture(map.id === 'snow' ? '#3a5a4a' : '#2a8a3a', 30);
+  const trunkTex = makeSkinTexture('#5a3a1a', 20); const leavesTex = makeSkinTexture(map.id === 'christmas' ? '#0a4a0a' : map.id === 'easter' ? '#4a9a4a' : '#2a8a3a', 30);
 
   for(let i=0;i<map.trees;i++){
     const x = rand(-ARENA*0.95, ARENA*0.95), z = rand(-ARENA*0.95, ARENA*0.95); 
@@ -441,7 +501,13 @@ function applyMapToScene(map){
   for(let i=0;i<map.rocks;i++){
     const x = rand(-ARENA*0.95, ARENA*0.95), z = rand(-ARENA*0.95, ARENA*0.95); 
     if(Math.hypot(x,z) < 6) continue;
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.3,1.2), 0), new THREE.MeshStandardMaterial({ color: map.id === 'snow' ? 0xaabbcc : map.id === 'desert' ? 0xa08050 : 0x555566, roughness:0.9, flatShading:true })); rock.position.set(x, rand(0.2,0.5), z); rock.rotation.set(rand(0,Math.PI), rand(0,Math.PI), rand(0,Math.PI)); rock.castShadow = true; decorGroup.add(rock);
+    let rockColor = 0x555566;
+    if(map.id === 'snow' || map.id === 'christmas') rockColor = 0xaabbcc;
+    else if(map.id === 'desert') rockColor = 0xa08050;
+    else if(map.id === 'halloween') rockColor = 0x332211;
+    else if(map.id === 'easter') rockColor = 0x88aa88;
+    
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.3,1.2), 0), new THREE.MeshStandardMaterial({ color: rockColor, roughness:0.9, flatShading:true })); rock.position.set(x, rand(0.2,0.5), z); rock.rotation.set(rand(0,Math.PI), rand(0,Math.PI), rand(0,Math.PI)); rock.castShadow = true; decorGroup.add(rock);
   }
 
   const mountainMat = new THREE.MeshStandardMaterial({ color: map.mountainColor, roughness: 1.0, flatShading: true });
@@ -464,7 +530,7 @@ function applyMapToScene(map){
   const pGeo = new THREE.BufferGeometry(); const pPts = [];
   for(let i=0;i<800;i++) pPts.push(rand(-100,100), rand(2,60), rand(-100,100));
   pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPts, 3));
-  const pColor = map.id === 'snow' ? 0xffffff : map.id === 'desert' ? 0xffdd88 : map.id === 'castle' ? 0xaa88cc : 0xaaffaa;
+  const pColor = map.id === 'snow' || map.id === 'christmas' ? 0xffffff : map.id === 'desert' ? 0xffdd88 : map.id === 'castle' ? 0xaa88cc : map.id === 'halloween' ? 0xff8800 : map.id === 'easter' ? 0xff88ff : 0xaaffaa;
   ambientParticles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color:pColor, size:0.2, transparent:true, opacity:0.4 })); scene.add(ambientParticles);
 }
 
@@ -658,9 +724,31 @@ function createEnemyMesh(type, map){
   }
   const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.15, 12, 1, true), leatherMat); belt.position.y = 0.4; g.add(belt);
   for(const dx of [-0.22, 0.22]){ const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.4, 8), skinMat); leg.position.set(dx, 0.2, 0); leg.castShadow = true; g.add(leg); }
+  
+  // Decoraciones temáticas
   if(map.enemyTheme === 'mummy'){ for(let y=0.4; y<1.6; y+=0.25){ const band = new THREE.Mesh(new THREE.CylinderGeometry(0.62 - y*0.05, 0.62 - y*0.05, 0.08, 12, 1, true), new THREE.MeshStandardMaterial({ color:0xe8d8b0, roughness:0.9 })); band.position.y = y; g.add(band); } }
   else if(map.enemyTheme === 'ice'){ for(let i=0;i<4;i++){ const a = i * Math.PI/2; const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), new THREE.MeshStandardMaterial({ color:0xccffee, emissive:0x88ccff, emissiveIntensity:0.6, transparent:true, opacity:0.8 })); crystal.position.set(Math.cos(a)*0.5, 1.0, Math.sin(a)*0.4); crystal.rotation.x = Math.PI/2; g.add(crystal); } }
   else if(map.enemyTheme === 'skeleton'){ for(let y=0.5; y<1.2; y+=0.12){ const rib = new THREE.Mesh(new THREE.TorusGeometry(0.4 - (y-0.5)*0.2, 0.03, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color:0xf0f0e0, roughness:0.7 })); rib.rotation.x = Math.PI/2; rib.position.y = y; g.add(rib); } }
+  else if(map.enemyTheme === 'halloween'){
+    // Sombrero de bruja
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 8), new THREE.MeshStandardMaterial({ color:0x1a0a1a }));
+    hat.position.y = 2.2; g.add(hat);
+  }
+  else if(map.enemyTheme === 'christmas'){
+    // Gorro de Santa
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.8, 8), new THREE.MeshStandardMaterial({ color:0xff0000 }));
+    hat.position.y = 2.1; g.add(hat);
+    const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshStandardMaterial({ color:0xffffff }));
+    pompom.position.set(0, 2.55, 0); g.add(pompom);
+  }
+  else if(map.enemyTheme === 'easter'){
+    // Orejas de conejo
+    for(const dx of [-0.2, 0.2]){
+      const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.4, 4, 6), new THREE.MeshStandardMaterial({ color:0xff88ff }));
+      ear.position.set(dx, 2.1, 0); g.add(ear);
+    }
+  }
+  
   g.scale.setScalar(def.scale);
   return g;
 }
@@ -881,6 +969,7 @@ function showMenu(){
   });
   html += `</div><p style="margin-top:8px;font-size:10px;opacity:0.7" id="diffDesc">${selectedDiff.desc}</p>
       <button class="btnStart" id="btnStart">▶ COMENZAR</button>
+      <button class="btnStart" id="btnRanking" style="margin-top:8px;background:linear-gradient(135deg,#ffaa00,#ff6600);color:#fff">🏆 VER RANKING</button>
       <div class="hint">WASD / Joystick para mover · Ataque automático</div>
     </div>`;
   ov.innerHTML = html;
@@ -906,6 +995,66 @@ function showMenu(){
   });
   document.getElementById('btnStart').addEventListener('click', (e) => {
     e.stopPropagation(); initAudio(); startGame();
+  });
+  document.getElementById('btnRanking').addEventListener('click', (e) => {
+    e.stopPropagation(); showRanking();
+  });
+}
+
+function showRanking() {
+  gameState = 'ranking';
+  const ov = document.getElementById('overlay');
+  const rankings = getRankings();
+  
+  let html = `
+    <div id="rankingContent">
+      <h1>🏆 RANKING</h1>
+      <p>Mejores puntuaciones por dificultad</p>
+      <div class="diffRow" style="margin-top:10px">
+  `;
+  DIFFICULTIES.forEach(d => {
+    html += `<button class="diffBtn rank-tab ${d.id === selectedDiff.id ? 'selected' : ''}" data-diff="${d.id}" style="color:${d.color}">${d.name}</button>`;
+  });
+  html += `</div><div id="rankList" style="margin-top:15px">`;
+  
+  const list = rankings[selectedDiff.id] || [];
+  if (list.length === 0) {
+    html += `<p style="color:#888;margin-top:20px">Aún no hay puntuaciones en esta dificultad.</p>`;
+  } else {
+    html += `<table class="rank-table">
+      <tr><th>#</th><th>Nombre</th><th>Oleada</th><th>Nivel</th></tr>`;
+    list.forEach((entry, i) => {
+      const cls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+      html += `<tr class="${cls}">
+        <td>${i + 1}</td>
+        <td>${entry.name}</td>
+        <td>${entry.wave}</td>
+        <td>${entry.score}</td>
+      </tr>`;
+    });
+    html += `</table>`;
+  }
+  
+  html += `</div>
+      <button class="btnStart" id="btnBackMenu" style="margin-top:20px">⬅ VOLVER AL MENÚ</button>
+    </div>`;
+  ov.innerHTML = html;
+  ov.classList.remove('hidden');
+
+  // Eventos para cambiar de pestaña de dificultad
+  ov.querySelectorAll('.rank-tab').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const diff = DIFFICULTIES.find(d => d.id === btn.dataset.diff);
+      if (!diff) return;
+      selectedDiff = diff;
+      showRanking(); // Recargar con la nueva dificultad
+    });
+  });
+
+  document.getElementById('btnBackMenu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    showMenu();
   });
 }
 
@@ -1002,21 +1151,17 @@ function triggerLevelUp(){
 
 function gameOver(){
   gameState = 'gameover';
-  const ov = document.getElementById('overlay');
-  ov.innerHTML = `
-    <h1 style="font-size:32px;background:linear-gradient(135deg,#f66,#fa6)">${selectedChar.icon} HAS CAÍDO</h1>
-    <p>Llegaste a la: <strong style="color:#ffd93d">Oleada ${currentWave}</strong></p>
-    <p>Mapa: <strong>${selectedMap.icon} ${selectedMap.name}</strong> · Dificultad: <strong>${selectedDiff.name}</strong></p>
-    <p>Nivel: <strong style="color:#b8a0ff">${level}</strong> · Bajas: <strong style="color:#ffd93d">${kills}</strong> · Cofres: <strong style="color:#ffaa00">${chestsOpened}</strong></p>
-    <button class="btnStart" id="btnRetry" style="margin-top:15px">🔄 REINTENTAR</button>
-    <button class="btnStart" id="btnMenu" style="margin-top:8px;background:linear-gradient(135deg,#4a3a8a,#2a2450);color:#fff">🏠 MENÚ</button>
-  `;
-  ov.classList.remove('hidden');
-  document.getElementById('btnRetry').addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame(); });
-  document.getElementById('btnMenu').addEventListener('click', (e) => { e.stopPropagation(); clearScene(); showMenu(); });
+  
+  // Mostrar modal para poner el nombre
+  const modal = document.getElementById('nameModal');
+  modal.classList.add('show');
+  document.getElementById('playerName').value = localStorage.getItem('bonk_last_name') || '';
+  document.getElementById('playerName').focus();
+  
   beep(150,0.6,'sawtooth',0.12,60);
 }
 
+// ==================== UPDATE ====================
 function updateUI(){
   document.getElementById('uiWave').textContent = currentWave;
   document.getElementById('uiLevel').textContent = level;
@@ -1098,12 +1243,10 @@ function startJoystick(x, y) {
   joystickActive = true;
   joystickOrigin = { x, y };
   
-  // Posicionar el joystick donde se tocó
   joystickEl.style.left = x + 'px';
   joystickEl.style.top = y + 'px';
   joystickEl.style.display = 'block';
   
-  // Resetear knob al centro
   knobEl.style.transform = 'translate(-50%, -50%)';
   joystickVector.x = 0;
   joystickVector.y = 0;
@@ -1114,7 +1257,7 @@ function updateJoystick(x, y) {
   
   let dx = x - joystickOrigin.x;
   let dy = y - joystickOrigin.y;
-  const maxDist = 50; // Radio máximo del joystick
+  const maxDist = 50;
   const dist = Math.hypot(dx, dy);
   
   if (dist > maxDist) {
@@ -1134,7 +1277,6 @@ function endJoystick() {
   joystickEl.style.display = 'none';
 }
 
-// Eventos táctiles en la zona izquierda
 const touchZone = document.getElementById('touchZone');
 touchZone.addEventListener('touchstart', (e) => {
   e.preventDefault();
@@ -1142,7 +1284,6 @@ touchZone.addEventListener('touchstart', (e) => {
   startJoystick(touch.clientX, touch.clientY);
 }, { passive: false });
 
-// Escuchar touchmove en todo el documento para que no se corte si sales de la zona
 window.addEventListener('touchmove', (e) => {
   if (!joystickActive) return;
   e.preventDefault();
@@ -1159,6 +1300,35 @@ window.addEventListener('touchend', (e) => {
 document.getElementById('btnFullscreen').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
   else if (document.exitFullscreen) document.exitFullscreen();
+});
+
+// Eventos del modal de nombre
+document.getElementById('btnSaveName').addEventListener('click', () => {
+  const name = document.getElementById('playerName').value.trim() || 'Anónimo';
+  localStorage.setItem('bonk_last_name', name);
+  
+  // Guardar en el ranking
+  const score = currentWave * 100 + kills; // Fórmula de puntuación
+  saveRanking(selectedDiff.id, name, score, currentWave);
+  
+  // Ocultar modal
+  document.getElementById('nameModal').classList.remove('show');
+  
+  // Mostrar pantalla de Game Over
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `
+    <h1 style="font-size:32px;background:linear-gradient(135deg,#f66,#fa6)">${selectedChar.icon} HAS CAÍDO</h1>
+    <p>Llegaste a la: <strong style="color:#ffd93d">Oleada ${currentWave}</strong></p>
+    <p>Mapa: <strong>${selectedMap.icon} ${selectedMap.name}</strong> · Dificultad: <strong>${selectedDiff.name}</strong></p>
+    <p>Nivel: <strong style="color:#b8a0ff">${level}</strong> · Bajas: <strong style="color:#ffd93d">${kills}</strong></p>
+    <p>Puntuación final: <strong style="color:#ffd93d;font-size:20px">${score}</strong></p>
+    <button class="btnStart" id="btnRetry" style="margin-top:15px">🔄 REINTENTAR</button>
+    <button class="btnStart" id="btnMenu" style="margin-top:8px;background:linear-gradient(135deg,#4a3a8a,#2a2450);color:#fff">🏠 MENÚ</button>
+  `;
+  ov.classList.remove('hidden');
+  
+  document.getElementById('btnRetry').addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame(); });
+  document.getElementById('btnMenu').addEventListener('click', (e) => { e.stopPropagation(); clearScene(); showMenu(); });
 });
 
 // ==================== UPDATE ====================
