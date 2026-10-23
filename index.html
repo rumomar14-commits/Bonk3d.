@@ -132,16 +132,23 @@
   }
   .diffBtn.selected { border-color:#ffd93d; background:#2a2450; color:#ffd93d; }
   
+  /* ZONA TÁCTIL PARA EL JOYSTICK DINÁMICO */
+  #touchZone {
+    position:absolute; top:0; left:0; width:50%; height:100%;
+    z-index:19; display:none; touch-action:none;
+  }
+  
+  /* JOYSTICK DINÁMICO */
   #joystick {
-    position:absolute; bottom:30px; left:30px;
-    width:100px; height:100px;
-    background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.2);
+    position:absolute; width:120px; height:120px;
+    background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.2);
     border-radius:50%; z-index:20; display:none;
-    touch-action:none;
+    touch-action:none; pointer-events:none;
+    transform:translate(-50%, -50%);
   }
   #joystickKnob {
     position:absolute; top:50%; left:50%;
-    width:44px; height:44px;
+    width:50px; height:50px;
     background:rgba(138,170,255,0.85); border:2px solid #fff;
     border-radius:50%; transform:translate(-50%,-50%);
     box-shadow:0 0 15px #8af;
@@ -198,6 +205,7 @@
   <div id="xpBarWrap"><div id="xpBar"></div></div>
   <div id="xpText">Nivel 1 · 0/5 XP</div>
   
+  <div id="touchZone"></div>
   <div id="joystick">
     <div id="joystickKnob"></div>
   </div>
@@ -335,7 +343,7 @@ let camera, renderer;
 let dirLight, hemiLight, ambientLight;
 let ground, outerGround, grid, decorGroup, ambientParticles;
 let ARENA = 45; 
-let mountains = []; // Para colisiones
+let mountains = []; 
 
 let selectedMap = MAPS[0];
 let selectedDiff = DIFFICULTIES[1];
@@ -355,10 +363,13 @@ let spawnTimer = 0;
 let isBossWave = false;
 let waveAnnounceTimer = 0;
 
+// Joystick variables
 let joystickActive = false;
 let joystickVector = { x: 0, y: 0 };
+let joystickOrigin = { x: 0, y: 0 }; // Dónde apareció el joystick
 const joystickEl = document.getElementById('joystick');
 const knobEl = document.getElementById('joystickKnob');
+const touchZoneEl = document.getElementById('touchZone');
 
 const enemyGroup = new THREE.Group();
 const projGroup = new THREE.Group();
@@ -398,19 +409,17 @@ function applyMapToScene(map){
   if(decorGroup) scene.remove(decorGroup); 
   if(ambientParticles) scene.remove(ambientParticles);
   
-  mountains = []; // Limpiar colisiones anteriores
+  mountains = []; 
   
   scene.background = new THREE.Color(map.skyColor); 
   scene.fog = new THREE.Fog(map.fogColor, map.fogNear, map.fogFar);
   ambientLight.color.setHex(map.ambientColor); dirLight.color.setHex(map.lightColor); hemiLight.color.setHex(map.lightColor);
 
-  // Suelo principal (Arena)
   const groundTex = makeGroundTexture(map.groundBase, map.groundAccent, map.groundPattern);
   const groundGeo = new THREE.PlaneGeometry(ARENA*2, ARENA*2);
   const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, color: map.groundColor, roughness: 0.95, metalness: 0.05 });
   ground = new THREE.Mesh(groundGeo, groundMat); ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 
-  // Suelo exterior
   const outerGroundGeo = new THREE.PlaneGeometry(400, 400);
   const outerGroundMat = new THREE.MeshStandardMaterial({ map: groundTex.clone(), color: map.groundColor, roughness: 1.0, metalness: 0.0 });
   outerGroundMat.map.repeat.set(20, 20);
@@ -422,7 +431,6 @@ function applyMapToScene(map){
   decorGroup = new THREE.Group(); scene.add(decorGroup);
   const trunkTex = makeSkinTexture('#5a3a1a', 20); const leavesTex = makeSkinTexture(map.id === 'snow' ? '#3a5a4a' : '#2a8a3a', 30);
 
-  // Árboles
   for(let i=0;i<map.trees;i++){
     const x = rand(-ARENA*0.95, ARENA*0.95), z = rand(-ARENA*0.95, ARENA*0.95); 
     if(Math.hypot(x,z) < 6) continue;
@@ -430,14 +438,12 @@ function applyMapToScene(map){
     for(let lvl = 0; lvl < 3; lvl++){ const cone = new THREE.Mesh(new THREE.ConeGeometry(0.9 - lvl*0.2, 1.3, 6), new THREE.MeshStandardMaterial({ map: leavesTex, color: map.treeColor, roughness:0.8 })); cone.position.set(x, 1.5 + lvl*0.7, z); cone.castShadow = true; decorGroup.add(cone); }
   }
   
-  // Rocas
   for(let i=0;i<map.rocks;i++){
     const x = rand(-ARENA*0.95, ARENA*0.95), z = rand(-ARENA*0.95, ARENA*0.95); 
     if(Math.hypot(x,z) < 6) continue;
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.3,1.2), 0), new THREE.MeshStandardMaterial({ color: map.id === 'snow' ? 0xaabbcc : map.id === 'desert' ? 0xa08050 : 0x555566, roughness:0.9, flatShading:true })); rock.position.set(x, rand(0.2,0.5), z); rock.rotation.set(rand(0,Math.PI), rand(0,Math.PI), rand(0,Math.PI)); rock.castShadow = true; decorGroup.add(rock);
   }
 
-  // Montañas de fondo (Con colisión y color distinguible)
   const mountainMat = new THREE.MeshStandardMaterial({ color: map.mountainColor, roughness: 1.0, flatShading: true });
   for(let i=0; i<36; i++){
     const ang = (i/36) * Math.PI * 2 + rand(-0.05, 0.05);
@@ -452,11 +458,9 @@ function applyMapToScene(map){
     m.receiveShadow = true;
     decorGroup.add(m);
     
-    // Guardamos el radio de colisión (un poco menor que el tamaño visual)
     mountains.push({ x: mx, z: mz, r: size * 0.8 });
   }
 
-  // Partículas de ambiente
   const pGeo = new THREE.BufferGeometry(); const pPts = [];
   for(let i=0;i<800;i++) pPts.push(rand(-100,100), rand(2,60), rand(-100,100));
   pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPts, 3));
@@ -466,11 +470,9 @@ function applyMapToScene(map){
 
 // ==================== COLISIONES ====================
 function resolveCollisions(entity, dt) {
-  // 1. Límites de la arena
   entity.x = clamp(entity.x, -ARENA+1, ARENA-1);
   entity.z = clamp(entity.z, -ARENA+1, ARENA-1);
 
-  // 2. Colisión con montañas
   for (const m of mountains) {
     const dx = entity.x - m.x;
     const dz = entity.z - m.z;
@@ -478,10 +480,8 @@ function resolveCollisions(entity, dt) {
     const minDist = m.r + entity.r;
     
     if (d < minDist) {
-      // Calcular vector de empuje
       const nx = dx / (d || 1);
       const nz = dz / (d || 1);
-      // Empujar al jugador hacia afuera
       entity.x = m.x + nx * minDist;
       entity.z = m.z + nz * minDist;
     }
@@ -1089,25 +1089,72 @@ window.addEventListener('keyup', onKeyUp);
 
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (isTouch) {
-  joystickEl.style.display = 'block';
+  document.getElementById('touchZone').style.display = 'block';
   document.getElementById('btnFullscreen').style.display = 'flex';
 }
 
-function updateJoystick(clientX, clientY) {
-  const rect = joystickEl.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  let dx = clientX - centerX; let dy = clientY - centerY;
-  const maxDist = rect.width / 2 - 20;
+// Lógica del Joystick Dinámico
+function startJoystick(x, y) {
+  joystickActive = true;
+  joystickOrigin = { x, y };
+  
+  // Posicionar el joystick donde se tocó
+  joystickEl.style.left = x + 'px';
+  joystickEl.style.top = y + 'px';
+  joystickEl.style.display = 'block';
+  
+  // Resetear knob al centro
+  knobEl.style.transform = 'translate(-50%, -50%)';
+  joystickVector.x = 0;
+  joystickVector.y = 0;
+}
+
+function updateJoystick(x, y) {
+  if (!joystickActive) return;
+  
+  let dx = x - joystickOrigin.x;
+  let dy = y - joystickOrigin.y;
+  const maxDist = 50; // Radio máximo del joystick
   const dist = Math.hypot(dx, dy);
-  if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
+  
+  if (dist > maxDist) {
+    dx = (dx / dist) * maxDist;
+    dy = (dy / dist) * maxDist;
+  }
+  
   knobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
   joystickVector.x = dx / maxDist;
   joystickVector.y = dy / maxDist;
 }
-joystickEl.addEventListener('touchstart', (e) => { e.preventDefault(); joystickActive = true; updateJoystick(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-joystickEl.addEventListener('touchmove', (e) => { e.preventDefault(); if (!joystickActive) return; updateJoystick(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-joystickEl.addEventListener('touchend', () => { joystickActive = false; joystickVector.x = 0; joystickVector.y = 0; knobEl.style.transform = 'translate(-50%, -50%)'; });
+
+function endJoystick() {
+  joystickActive = false;
+  joystickVector.x = 0;
+  joystickVector.y = 0;
+  joystickEl.style.display = 'none';
+}
+
+// Eventos táctiles en la zona izquierda
+const touchZone = document.getElementById('touchZone');
+touchZone.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  startJoystick(touch.clientX, touch.clientY);
+}, { passive: false });
+
+// Escuchar touchmove en todo el documento para que no se corte si sales de la zona
+window.addEventListener('touchmove', (e) => {
+  if (!joystickActive) return;
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  updateJoystick(touch.clientX, touch.clientY);
+}, { passive: false });
+
+window.addEventListener('touchend', (e) => {
+  if (!joystickActive) return;
+  e.preventDefault();
+  endJoystick();
+}, { passive: false });
 
 document.getElementById('btnFullscreen').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
@@ -1149,7 +1196,6 @@ function update(dt){
 
   if(gameState !== 'playing' || !player) return;
 
-  // Manejo del anuncio de oleada
   if(waveAnnounceTimer > 0){
     waveAnnounceTimer -= dt;
     if(waveAnnounceTimer <= 0){
@@ -1175,7 +1221,6 @@ function update(dt){
     player.mesh.position.y *= 0.9;
   }
   
-  // Resolver colisiones del jugador
   resolveCollisions(player, dt);
   
   if(player.invuln > 0) player.invuln -= dt;
@@ -1248,7 +1293,6 @@ function update(dt){
     e.x += (dx/d)*e.speed*dt; e.z += (dz/d)*e.speed*dt;
     e.bobPhase += dt*8;
     
-    // Resolver colisiones de enemigos
     resolveCollisions(e, dt);
     
     e.mesh.position.set(e.x, Math.abs(Math.sin(e.bobPhase)) * 0.06, e.z);
