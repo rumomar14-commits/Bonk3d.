@@ -25,10 +25,10 @@
   .stat-label { font-size:10px; opacity:0.7; letter-spacing:1px; text-transform:uppercase; }
   .stat-val { font-size:16px; color:#ffd93d; font-weight:bold; }
 
-  /* HUD SUPERIOR DERECHO (Enemigos) */
+  /* HUD SUPERIOR DERECHO (Enemigos + Pausa) */
   #hudRight {
     position:absolute; top:15px; right:15px;
-    display:flex; flex-direction:column; align-items:flex-end;
+    display:flex; flex-direction:column; align-items:flex-end; gap:10px;
     pointer-events:none; z-index:5; 
   }
   #enemiesLeft {
@@ -37,6 +37,14 @@
     padding:6px 12px; border-radius:6px;
     box-shadow:0 2px 10px rgba(0,0,0,0.5);
     letter-spacing:1px;
+  }
+  #btnPause {
+    pointer-events:auto;
+    width:40px; height:40px; font-size:20px;
+    background:rgba(10,10,20,0.65); border:2px solid #4a3a8a;
+    border-radius:8px; color:#fff; cursor:pointer;
+    display:none; align-items:center; justify-content:center;
+    z-index:25;
   }
 
   /* HUD CENTRAL (Vida) */
@@ -132,6 +140,13 @@
   }
   .diffBtn.selected { border-color:#ffd93d; background:#2a2450; color:#ffd93d; }
   
+  /* ZONA TÁCTIL PARA EL JOYSTICK DINÁMICO */
+  #touchZone {
+    position:absolute; top:0; left:0; width:50%; height:100%;
+    z-index:19; display:none; touch-action:none;
+  }
+  
+  /* JOYSTICK DINÁMICO */
   #joystick {
     position:absolute; width:120px; height:120px;
     background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.2);
@@ -156,17 +171,7 @@
     display:none; z-index:20; align-items:center; justify-content:center;
   }
 
-  /* RANKING */
-  #rankingContent { max-width:600px; width:100%; }
-  .rank-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
-  .rank-table th { background:rgba(138,170,255,0.2); padding:8px; border:1px solid #4a3a8a; color:#b8a0ff; }
-  .rank-table td { padding:8px; border:1px solid #2a2450; text-align:center; }
-  .rank-table tr:nth-child(even) { background:rgba(255,255,255,0.03); }
-  .rank-table tr.top1 td { color:#ffd93d; font-weight:bold; font-size:16px; }
-  .rank-table tr.top2 td { color:#c0c0c0; font-weight:bold; }
-  .rank-table tr.top3 td { color:#cd7f32; font-weight:bold; }
-  
-  /* MODAL INPUT */
+  /* MODAL PARA PONER EL NOMBRE */
   #nameModal {
     position:absolute; inset:0; background:rgba(0,0,0,0.85);
     display:flex; flex-direction:column; justify-content:center; align-items:center;
@@ -179,11 +184,24 @@
     outline:none; width:250px;
   }
   #nameModal input:focus { border-color:#8af; }
-  
-  #touchZone {
-    position:absolute; top:0; left:0; width:50%; height:100%;
-    z-index:19; display:none; touch-action:none;
+
+  /* PAUSE MENU */
+  #pauseMenu {
+    position:absolute; inset:0; background:rgba(6,6,15,0.95);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    z-index:40; opacity:0; pointer-events:none; transition:opacity 0.3s;
+    backdrop-filter:blur(8px); text-align:center; padding:20px;
   }
+  #pauseMenu.show { opacity:1; pointer-events:auto; }
+  #pauseMenu h1 { font-size:32px; margin-bottom:15px; }
+  .stats-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    background:rgba(255,255,255,0.05); padding:15px; border-radius:10px;
+    border:1px solid #4a3a8a; margin-bottom:20px; max-width:400px; width:100%;
+  }
+  .stats-grid .stat-item { display:flex; justify-content:space-between; font-size:14px; }
+  .stats-grid .stat-item span:first-child { color:#aaa; }
+  .stats-grid .stat-item span:last-child { color:#ffd93d; font-weight:bold; }
   
   @media (max-height: 500px) {
     h1 { font-size:24px; }
@@ -199,7 +217,8 @@
     #hpBarWrap { width:180px; }
     .stat-row { min-width:80px; padding:2px 6px; }
     .stat-val { font-size:13px; }
-    .rank-table th, .rank-table td { padding:4px; font-size:11px; }
+    .stats-grid { grid-template-columns:1fr 1fr; gap:6px; padding:10px; }
+    .stats-grid .stat-item { font-size:12px; }
   }
 </style>
 </head>
@@ -214,6 +233,7 @@
   
   <div id="hudRight">
     <div id="enemiesLeft">Enemigos: 0</div>
+    <button id="btnPause">☰</button>
   </div>
 
   <div id="hpContainer">
@@ -234,6 +254,16 @@
   </div>
   
   <button id="btnFullscreen">⛶</button>
+
+  <!-- MENÚ DE PAUSA -->
+  <div id="pauseMenu">
+    <h1>PAUSA</h1>
+    <div class="stats-grid" id="pauseStats">
+      <!-- Se llena dinámicamente -->
+    </div>
+    <button class="btnStart" id="btnResume">▶ REANUDAR</button>
+    <button class="btnStart" id="btnQuit" style="margin-top:8px;background:linear-gradient(135deg,#4a3a8a,#2a2450);color:#fff">🏠 VOLVER AL MENÚ</button>
+  </div>
   
   <!-- MODAL PARA PONER EL NOMBRE -->
   <div id="nameModal">
@@ -279,8 +309,8 @@ function saveRanking(diffId, name, score, wave) {
   if (!rankings[diffId]) rankings[diffId] = [];
   
   rankings[diffId].push({ name, score, wave, date: Date.now() });
-  rankings[diffId].sort((a, b) => b.score - a.score); // Mayor puntuación primero
-  rankings[diffId] = rankings[diffId].slice(0, 10); // Top 10
+  rankings[diffId].sort((a, b) => b.score - a.score);
+  rankings[diffId] = rankings[diffId].slice(0, 10);
   
   localStorage.setItem(RANKING_KEY, JSON.stringify(rankings));
 }
@@ -375,7 +405,6 @@ const MAPS = [
   { id:'desert', name:'Desierto Ardiente', icon:'🏜️', desc:'Momias.', groundColor: 0xd4b076, groundBase: '#c4a066', groundAccent: '#a08040', groundPattern: 'sand', fogColor: 0x4a3010, fogNear: 45, fogFar: 110, ambientColor: 0x604030, skyColor: 0x8a6a40, lightColor: 0xffddaa, trees: 0, treeColor: 0x8a6a30, rocks: 80, mountainColor: 0x5a2a10, mountainDist: 55, enemyTheme: 'mummy', enemyColors: { grunt:0xd4b076, scout:0xe8c890, shaman:0xa08040, brute:0x8a6030 }, bossColor: 0xaa6633 },
   { id:'snow', name:'Cumbres Heladas', icon:'❄️', desc:'Gigantes de hielo.', groundColor: 0xe8eef5, groundBase: '#d8e0f0', groundAccent: '#a8c8e0', groundPattern: 'snow', fogColor: 0x8090b0, fogNear: 55, fogFar: 130, ambientColor: 0x6080a0, skyColor: 0x90a8c8, lightColor: 0xcce0ff, trees: 80, treeColor: 0x2a4a3a, rocks: 40, mountainColor: 0x223344, mountainDist: 65, enemyTheme: 'ice', enemyColors: { grunt:0x88ccdd, scout:0xaaddff, shaman:0x66aacc, brute:0x4488aa }, bossColor: 0x2288cc },
   { id:'castle', name:'Castillo Maldito', icon:'🏰', desc:'Esqueletos.', groundColor: 0x4a4a5a, groundBase: '#3a3a4a', groundAccent: '#1a1a2a', groundPattern: 'stone', fogColor: 0x1a1020, fogNear: 40, fogFar: 100, ambientColor: 0x303050, skyColor: 0x1a1020, lightColor: 0xaa88cc, trees: 0, treeColor: 0x2a2a3a, rocks: 100, mountainColor: 0x1a0a1a, mountainDist: 50, enemyTheme: 'skeleton', enemyColors: { grunt:0xd8d8c0, scout:0xe8e8d0, shaman:0xaa88cc, brute:0x808090 }, bossColor: 0x662266 },
-  // NUEVOS MAPAS TEMÁTICOS
   { id:'halloween', name:'Noche de Brujas', icon:'🎃', desc:'Calabazas y fantasmas.', groundColor: 0x1a0a1a, groundBase: '#1a0a1a', groundAccent: '#ff6600', groundPattern: 'pumpkin', fogColor: 0x2a0a0a, fogNear: 40, fogFar: 90, ambientColor: 0x604020, skyColor: 0x0a0005, lightColor: 0xffaa44, trees: 40, treeColor: 0x2a1a0a, rocks: 50, mountainColor: 0x1a0a05, mountainDist: 50, enemyTheme: 'halloween', enemyColors: { grunt:0xff8800, scout:0xffaa00, shaman:0xaa44ff, brute:0xcc2200 }, bossColor: 0xaa00ff },
   { id:'christmas', name:'Navidad', icon:'🎄', desc:'Duendes y muñecos de nieve.', groundColor: 0xf0f8ff, groundBase: '#f0f8ff', groundAccent: '#aaccff', groundPattern: 'snow', fogColor: 0x88aaff, fogNear: 45, fogFar: 100, ambientColor: 0x405080, skyColor: 0x1a2a5a, lightColor: 0xcceeff, trees: 120, treeColor: 0x0a4a0a, rocks: 20, mountainColor: 0x2a3a5a, mountainDist: 55, enemyTheme: 'christmas', enemyColors: { grunt:0x00aa00, scout:0x00cc00, shaman:0xcc0000, brute:0xaa0000 }, bossColor: 0xff0000 },
   { id:'easter', name:'Pascua', icon:'🐰', desc:'Conejos y huevos.', groundColor: 0x4a8a4a, groundBase: '#4a8a4a', groundAccent: '#ffccff', groundPattern: 'grass', fogColor: 0x88ccaa, fogNear: 50, fogFar: 110, ambientColor: 0x6080a0, skyColor: 0x88ccff, lightColor: 0xffffcc, trees: 100, treeColor: 0x4a9a4a, rocks: 30, mountainColor: 0x2a5a2a, mountainDist: 60, enemyTheme: 'easter', enemyColors: { grunt:0xff88ff, scout:0xffff88, shaman:0x88ffff, brute:0xff8888 }, bossColor: 0xffff00 },
@@ -409,7 +438,7 @@ let selectedMap = MAPS[0];
 let selectedDiff = DIFFICULTIES[1];
 let selectedChar = CHARACTERS[0];
 
-let gameState = 'menu';
+let gameState = 'menu'; // 'menu', 'playing', 'paused', 'levelup', 'gameover', 'ranking'
 let player = null;
 let enemies = [], projectiles = [], gems = [], particles = [], chests = [];
 let kills = 0, elapsed = 0, chestTimer = 0, level = 1, xp = 0, xpNext = 5;
@@ -730,19 +759,16 @@ function createEnemyMesh(type, map){
   else if(map.enemyTheme === 'ice'){ for(let i=0;i<4;i++){ const a = i * Math.PI/2; const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), new THREE.MeshStandardMaterial({ color:0xccffee, emissive:0x88ccff, emissiveIntensity:0.6, transparent:true, opacity:0.8 })); crystal.position.set(Math.cos(a)*0.5, 1.0, Math.sin(a)*0.4); crystal.rotation.x = Math.PI/2; g.add(crystal); } }
   else if(map.enemyTheme === 'skeleton'){ for(let y=0.5; y<1.2; y+=0.12){ const rib = new THREE.Mesh(new THREE.TorusGeometry(0.4 - (y-0.5)*0.2, 0.03, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color:0xf0f0e0, roughness:0.7 })); rib.rotation.x = Math.PI/2; rib.position.y = y; g.add(rib); } }
   else if(map.enemyTheme === 'halloween'){
-    // Sombrero de bruja
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 8), new THREE.MeshStandardMaterial({ color:0x1a0a1a }));
     hat.position.y = 2.2; g.add(hat);
   }
   else if(map.enemyTheme === 'christmas'){
-    // Gorro de Santa
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.8, 8), new THREE.MeshStandardMaterial({ color:0xff0000 }));
     hat.position.y = 2.1; g.add(hat);
     const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshStandardMaterial({ color:0xffffff }));
     pompom.position.set(0, 2.55, 0); g.add(pompom);
   }
   else if(map.enemyTheme === 'easter'){
-    // Orejas de conejo
     for(const dx of [-0.2, 0.2]){
       const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.4, 4, 6), new THREE.MeshStandardMaterial({ color:0xff88ff }));
       ear.position.set(dx, 2.1, 0); g.add(ear);
@@ -974,6 +1000,8 @@ function showMenu(){
     </div>`;
   ov.innerHTML = html;
   ov.classList.remove('hidden');
+  document.getElementById('btnPause').style.display = 'none';
+  document.getElementById('touchZone').style.display = 'none';
 
   ov.querySelectorAll('.card[data-char]').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -1041,14 +1069,13 @@ function showRanking() {
   ov.innerHTML = html;
   ov.classList.remove('hidden');
 
-  // Eventos para cambiar de pestaña de dificultad
   ov.querySelectorAll('.rank-tab').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const diff = DIFFICULTIES.find(d => d.id === btn.dataset.diff);
       if (!diff) return;
       selectedDiff = diff;
-      showRanking(); // Recargar con la nueva dificultad
+      showRanking();
     });
   });
 
@@ -1082,7 +1109,13 @@ function startGame(){
   upgradeChoices = null; chestsOpened = 0;
   currentWave = 0;
   startNextWave();
-  gameState = 'playing'; document.getElementById('overlay').classList.add('hidden'); updateUI();
+  
+  gameState = 'playing'; 
+  document.getElementById('overlay').classList.add('hidden'); 
+  document.getElementById('btnPause').style.display = 'flex';
+  document.getElementById('touchZone').style.display = 'block';
+  
+  updateUI();
 }
 
 function startNextWave(){
@@ -1152,13 +1185,43 @@ function triggerLevelUp(){
 function gameOver(){
   gameState = 'gameover';
   
-  // Mostrar modal para poner el nombre
   const modal = document.getElementById('nameModal');
   modal.classList.add('show');
   document.getElementById('playerName').value = localStorage.getItem('bonk_last_name') || '';
   document.getElementById('playerName').focus();
   
+  document.getElementById('btnPause').style.display = 'none';
+  document.getElementById('touchZone').style.display = 'none';
+  
   beep(150,0.6,'sawtooth',0.12,60);
+}
+
+// ==================== PAUSE MENU ====================
+function togglePause() {
+  if (gameState === 'playing') {
+    gameState = 'paused';
+    document.getElementById('pauseMenu').classList.add('show');
+    document.getElementById('btnPause').style.display = 'none';
+    document.getElementById('touchZone').style.display = 'none';
+    
+    // Rellenar estadísticas
+    const stats = document.getElementById('pauseStats');
+    stats.innerHTML = `
+      <div class="stat-item"><span>Daño</span><span>${player.damage.toFixed(1)}</span></div>
+      <div class="stat-item"><span>Ataque/s</span><span>${(1/player.fireRate).toFixed(1)}</span></div>
+      <div class="stat-item"><span>Velocidad</span><span>${player.speed.toFixed(1)}</span></div>
+      <div class="stat-item"><span>Alcance</span><span>${player.range.toFixed(1)}</span></div>
+      <div class="stat-item"><span>Proyectiles</span><span>${player.projCount}</span></div>
+      <div class="stat-item"><span>Perforación</span><span>${player.pierce}</span></div>
+      <div class="stat-item"><span>Vida Máx</span><span>${player.maxHp}</span></div>
+      <div class="stat-item"><span>Imán</span><span>${player.magnet.toFixed(1)}</span></div>
+    `;
+  } else if (gameState === 'paused') {
+    gameState = 'playing';
+    document.getElementById('pauseMenu').classList.remove('show');
+    document.getElementById('btnPause').style.display = 'flex';
+    document.getElementById('touchZone').style.display = 'block';
+  }
 }
 
 // ==================== UPDATE ====================
@@ -1234,7 +1297,6 @@ window.addEventListener('keyup', onKeyUp);
 
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (isTouch) {
-  document.getElementById('touchZone').style.display = 'block';
   document.getElementById('btnFullscreen').style.display = 'flex';
 }
 
@@ -1307,14 +1369,11 @@ document.getElementById('btnSaveName').addEventListener('click', () => {
   const name = document.getElementById('playerName').value.trim() || 'Anónimo';
   localStorage.setItem('bonk_last_name', name);
   
-  // Guardar en el ranking
-  const score = currentWave * 100 + kills; // Fórmula de puntuación
+  const score = currentWave * 100 + kills;
   saveRanking(selectedDiff.id, name, score, currentWave);
   
-  // Ocultar modal
   document.getElementById('nameModal').classList.remove('show');
   
-  // Mostrar pantalla de Game Over
   const ov = document.getElementById('overlay');
   ov.innerHTML = `
     <h1 style="font-size:32px;background:linear-gradient(135deg,#f66,#fa6)">${selectedChar.icon} HAS CAÍDO</h1>
@@ -1329,6 +1388,15 @@ document.getElementById('btnSaveName').addEventListener('click', () => {
   
   document.getElementById('btnRetry').addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame(); });
   document.getElementById('btnMenu').addEventListener('click', (e) => { e.stopPropagation(); clearScene(); showMenu(); });
+});
+
+// Eventos del menú de pausa
+document.getElementById('btnPause').addEventListener('click', togglePause);
+document.getElementById('btnResume').addEventListener('click', togglePause);
+document.getElementById('btnQuit').addEventListener('click', () => {
+  document.getElementById('pauseMenu').classList.remove('show');
+  clearScene();
+  showMenu();
 });
 
 // ==================== UPDATE ====================
